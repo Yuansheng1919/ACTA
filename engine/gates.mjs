@@ -3,7 +3,7 @@ import { reject } from './fault.mjs';
 export const sections = ['description', 'personality', 'scenario', 'first_mes', 'mes_example'];
 export const examplePolicy = {
   version: 'synthetic-1', locations: ['甲','乙'], phases: ['早','晚'],
-  blocked: ['校服','未成年','幼态','校园'], templates: ['【场外点名】'],
+  blocked: ['校服','未成年','幼态','校园'], patterns: [], templates: ['【场外点名】'],
   lengths: Object.fromEntries(sections.map(key => [key,[4,1200]])),
   sentenceWarn: 45, similePer100: 4
 };
@@ -16,11 +16,38 @@ export function object(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-function scan(text, policy, path) {
-  const normalized = text.normalize('NFKC').toLowerCase();
-  if (policy.blocked.some(word => normalized.includes(word.normalize('NFKC').toLowerCase())))
+const policies = new WeakMap();
+const fold = text => text.normalize('NFKC').toLowerCase();
+
+export function compileRules(policy) {
+  const cached = policies.get(policy);
+  if (cached) return cached;
+  const legacy = !Object.hasOwn(policy, 'patterns');
+  const regexes = (name, values) => {
+    if (!Array.isArray(values) || values.some(value => typeof value !== 'string' || !value.trim()))
+      throw Error('config.invalid.policy.' + name);
+    try { return values.map(value => new RegExp(value, 'iu')); }
+    catch { throw Error('config.invalid.policy.' + name); }
+  };
+  const rules = {
+    words: policy.blocked.map(fold),
+    patterns: legacy ? [] : regexes('patterns', policy.patterns),
+    names: legacy ? [] : policy.templates.map(fold),
+    legacyTemplates: legacy ? regexes('templates', policy.templates) : []
+  };
+  policies.set(policy, rules);
+  return rules;
+}
+
+export function scan(text, policy, path) {
+  const normalized = fold(text);
+  const rules = compileRules(policy);
+  if (rules.words.some(word => normalized.includes(word)))
     reject(422, 'verdict.blocked', { path });
-  if (policy.templates.some(pattern => new RegExp(pattern, 'iu').test(normalized)))
+  if (rules.patterns.some(pattern => pattern.test(normalized)))
+    reject(422, 'verdict.pattern', { path });
+  if (rules.names.some(name => normalized.includes(name)) ||
+      rules.legacyTemplates.some(pattern => pattern.test(normalized)))
     reject(422, 'verdict.template', { path });
 }
 

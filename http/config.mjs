@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { sections, object, examplePolicy } from '../engine/gates.mjs';
+import { sections, object, examplePolicy, compileRules } from '../engine/gates.mjs';
 import { hash } from '../store/commit.mjs';
 import { Fault } from '../engine/fault.mjs';
 
@@ -34,8 +34,7 @@ export function validatePolicy(p) {
   }
   for (const field of ['sentenceWarn','similePer100'])
     if (!Number.isFinite(p[field]) || p[field] < 0) invalid('policy.' + field);
-  try { for (const pattern of p.templates) new RegExp(pattern, 'iu'); }
-  catch { invalid('policy.templates'); }
+  compileRules(p);
   return p;
 }
 
