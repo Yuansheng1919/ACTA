@@ -34,3 +34,27 @@ test('artifact order, empty first part, stale artifact and nonzero exit', async 
   for(const [mode,code] of [['blank','host.empty'],['stale','host.invalid_artifact'],['bad','host.failed']])
     await assert.rejects(run(mode), { code });
 });
+
+test('stdout-only success exit retains bounded private diagnostics and never publishes a draft', async t => {
+  const root=await mkdtemp(join(tmpdir(),'acta-diag-'));
+  t.after(()=>rm(root,{recursive:true,force:true}));
+  const script=join(root,'diagnostic.mjs');
+  await writeFile(script,`for await (const part of process.stdin) {}
+    process.stdout.write('stdout-probe'+'x'.repeat(9000));process.stderr.write('y'.repeat(10000));`);
+  await assert.rejects(runHost({root,entry:script},'合成'), err => {
+    assert.equal(err.code,'host.empty');
+    assert.equal(Buffer.byteLength(err.diagnostics.stdout),8192);
+    assert.equal(Buffer.byteLength(err.diagnostics.stderr),8192);
+    assert.match(err.diagnostics.stdout,/^stdout-probe/);
+    assert.ok(!JSON.stringify(err).includes('stdout-probe'));
+    return true;
+  });
+});
+
+test('NO_PROXY/no_proxy inheritance and Windows host environment allowlist', async () => {
+  const {hostEnvironment}=await import('../engine/host.mjs');
+  const parent={PATH:'bin',NO_PROXY:'a,b',no_proxy:'b,c',SystemRoot:'root',windir:'win',TEMP:'temp',PRIVATE:'omit'};
+  const env=hostEnvironment({NO_PROXY:'d'},parent,'win32');
+  assert.deepEqual(env,{PATH:'bin',SystemRoot:'root',windir:'win',TEMP:'temp',NO_PROXY:'a,b,c,d',no_proxy:'a,b,c,d'});
+  assert.equal(hostEnvironment({},parent,'linux').TEMP,undefined);
+});
