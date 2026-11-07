@@ -1,0 +1,52 @@
+{
+  "_note": "样例子集：仅用于实现 patterns/templates 三段拆分。完整词表私下交付，字段同构。",
+  "version": "sample-20261108",
+  "locations": [
+    "home.living",
+    "home.room_main",
+    "home.room_a",
+    "home.bath",
+    "home.kitchen",
+    "home.toilet",
+    "home.entrance"
+  ],
+  "phases": [
+    "早",
+    "晚"
+  ],
+  "blocked": [
+    "未成年",
+    "幼态"
+  ],
+  "patterns": [
+    "\\\\d{1,3}\\\\s*岁",
+    "小[学初高]生|校服|书包|班级"
+  ],
+  "templates": [
+    "【场外点名】"
+  ],
+  "lengths": {
+    "description": [
+      2500,
+      3400
+    ],
+    "personality": [
+      100,
+      200
+    ],
+    "scenario": [
+      90,
+      170
+    ],
+    "first_mes": [
+      380,
+      580
+    ],
+    "mes_example": [
+      1700,
+      2600
+    ]
+  },
+  "sentenceWarn": 45,
+  "similePer100": 1.5
+}
