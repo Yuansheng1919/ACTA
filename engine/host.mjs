@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, rm, readdir, readFile, lstat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { reject } from './fault.mjs';
+import { Fault, reject } from './fault.mjs';
 
 const diagnosticsLimit = 8192;
 const artifactLimit = 1024 * 1024;
@@ -15,11 +15,13 @@ async function readParts(dir, started) {
   if (!parts.length) reject(502, 'host.empty');
   let size = 0;
   const texts = [];
+  const seen = new Set();
   for (const [i, part] of parts.entries()) {
     const file = join(out, part.name);
     const stat = await lstat(file);
-    if (!stat.isFile() || Math.ceil(stat.mtimeMs) < started || part.seq === parts[i-1]?.seq)
+    if (!stat.isFile() || Math.ceil(stat.mtimeMs) < started || !Number.isSafeInteger(part.seq) || seen.has(part.seq))
       reject(502, 'host.invalid_artifact');
+    seen.add(part.seq);
     size += stat.size;
     if (size > artifactLimit) reject(502, 'host.artifact_limit');
     const raw = await readFile(file);
@@ -32,19 +34,40 @@ async function readParts(dir, started) {
   return texts.join('');
 }
 
+export function hostEnvironment(overrides, parent = process.env, platform = process.platform) {
+  const env = { PATH: parent.PATH };
+  if (platform === 'win32') {
+    for (const key of ['SystemRoot', 'windir', 'TEMP']) {
+      if (parent[key] !== undefined) env[key] = parent[key];
+    }
+  }
+  Object.assign(env, overrides);
+  const bypass = [parent.NO_PROXY, parent.no_proxy, overrides.NO_PROXY, overrides.no_proxy]
+    .filter(Boolean).flatMap(list => list.split(',')).map(item => item.trim()).filter(Boolean);
+  if (bypass.length) env.NO_PROXY = env.no_proxy = [...new Set(bypass)].join(',');
+  return env;
+}
+
+function capture(stream) {
+  let buffer = Buffer.alloc(0);
+  stream.on('data', bytes => {
+    const room = diagnosticsLimit - buffer.length;
+    if (room > 0) buffer = Buffer.concat([buffer, bytes.subarray(0, room)]);
+  });
+  // Drop a partial UTF-8 sequence cut off at the byte cap.
+  return () => new TextDecoder().decode(buffer, { stream: true });
+}
+
 // A prepared worker already owns a new job directory and can receive stdin exactly once.
 export async function prepareHost({ root, entry, profile = 'default', env = {}, timeoutMs = 480000 }) {
   await mkdir(root, { recursive: true, mode: 0o700 });
   const dir = await mkdtemp(join(root, 'work-'));
   const child = spawn(process.execPath, [resolve(entry), profile, '-'], {
-    cwd: dir, shell: false, stdio: ['pipe', 'ignore', 'pipe'],
-    env: { PATH: process.env.PATH, ...env, PROFILE: profile }
+    cwd: dir, shell: false, stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...hostEnvironment(env), PROFILE: profile }
   });
-  let diagnostic = Buffer.alloc(0);
-  child.stderr.on('data', data => {
-    if (diagnostic.length < diagnosticsLimit)
-      diagnostic = Buffer.concat([diagnostic, data.subarray(0, diagnosticsLimit - diagnostic.length)]);
-  });
+  const stdoutText = capture(child.stdout);
+  const stderrText = capture(child.stderr);
   child.stdin.on('error', () => {});
   let spawnError = false;
   const exit = new Promise(resolveExit => {
@@ -72,7 +95,7 @@ export async function prepareHost({ root, entry, profile = 'default', env = {}, 
         else child.stdin.end(taskText, 'utf8');
         const code = await exit;
         if (expired || signal?.aborted) reject(504, 'host.timeout');
-        const stderr = diagnostic.toString('utf8');
+        const stderr = stderrText();
         if (/policy refusal|content.filter|策略拒绝/i.test(stderr)) reject(502, 'host.refused');
         if (code !== 0 || spawnError) {
           if (/auth|balance|quota|鉴权|余额/i.test(stderr)) reject(502, 'host.unavailable');
@@ -80,11 +103,17 @@ export async function prepareHost({ root, entry, profile = 'default', env = {}, 
           reject(502, 'host.failed');
         }
         return { text: await readParts(dir, started), attempts: 1, ms: Date.now() - started,
+          stdout: stdoutText(), stderr,
           usage: { input_tokens: null, output_tokens: null } };
+      } catch (error) {
+        if (error instanceof Fault) Object.defineProperty(error, 'diagnostics', {
+          value: { stdout: stdoutText(), stderr: stderrText() }, enumerable: false
+        });
+        throw error;
       } finally {
         clearTimeout(timer);
         signal?.removeEventListener('abort', kill);
-        await rm(dir, { recursive: true, force: true });
+        await dispose();
       }
     }
   };
