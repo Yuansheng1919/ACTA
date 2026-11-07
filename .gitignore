@@ -1,0 +1,22 @@
+# 忽略：凭据、本地数据、真实样本
+.env
+.env.*
+*.key
+*.pem
+secrets*
+credentials*
+
+# 运行时产物
+node_modules/
+data/
+logs/
+out/
+tmp/
+*.log
+
+# 真实样本（验收样本不入库，只提交合成样本）
+samples/real/
+*.卡.png
+*卡*.png
+*.world.json.bak*
+*.bak-*
