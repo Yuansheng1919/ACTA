@@ -71,6 +71,6 @@ export async function harness(t,cfg={}) {
   };
   const play=(session,rev,id,extra={},options={})=>request('/v1/chat/completions',{...options,body:{
     model:'engine',session_id:session,expected_rev:rev,turn_id:id,messages:[{role:'user',content:'合成输入'}],...extra}});
-  return {root,url,tokens,hmacKey,logs,daemon,access,request,build,open,play,restart,stop,observations,
+  return {root,url,engineUrl:()=> 'http://127.0.0.1:'+enginePort,tokens,hmacKey,logs,daemon,access,request,build,open,play,restart,stop,observations,
     scenario:data=>save('scenario.json',data),replaceTokens:value=>save('tokens.json',value)};
 }
