@@ -1,3 +1,4 @@
+import { guardVersion, schemaVersion } from './guard.mjs';
 import { Fault, reject } from './fault.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { checkSpec, checkSection, sections, object, scan } from './gates.mjs';
@@ -35,7 +36,10 @@ function dual(blocks,ctx) {
   if(ccv3 && chara) {
     const a=rowOf(chara),b=rowOf(ccv3);
     if(!object(a)||!object(b))reject(422,'import.card_shape');
-    const changes=[...new Set([...Object.keys(a),...Object.keys(b)])].filter(k=>!isDeepStrictEqual(a[k],b[k]));
+    const changes=[...new Set([...Object.keys(a),...Object.keys(b)])].filter(k=>{
+      if(k==='group_only_greetings' && a[k]===undefined && Array.isArray(b[k]) && !b[k].length)return false;
+      return !isDeepStrictEqual(a[k],b[k]);
+    });
     ctx.dual=changes.length?'different':'equal';
     for(const k of changes)ctx.diff.push(flag('dual.'+k,'preferred','ccv3_wins'));
   }
@@ -126,7 +130,7 @@ export function normalizeImport(file,options,p,base) {
   if(original!==raw)for(const k of [...sections,'name'])if(Object.hasOwn(raw,k)&&raw[k]!==root[k])
     ctx.diff.push(flag(k,'preferred','nested_data_wins'));
   if(options.external_world!==undefined){inspectContent(options.external_world,p);ctx.books.push(['external',options.external_world]);}
-  const books=[['embedded',root.character_book],...ctx.books];
+  const books=[['embedded',root.character_book],...ctx.books.filter(([,book])=>!isDeepStrictEqual(book,root.character_book))];
   const row=choose(root,books,options.select,ctx.diff);
   books[0]=['embedded',row.character_book];
   const embedded=row.extensions?.acta?.spec??row.card_spec??{};
@@ -145,6 +149,11 @@ export function normalizeImport(file,options,p,base) {
   const texts=Object.fromEntries(sections.map(k=>[k,Object.hasOwn(textChanges,k)?textChanges[k]:row[k]]));
   for(const k of Object.keys(textChanges))ctx.diff.push(flag(k,'overridden','manual'));
   const issues=[];
+  const stamps=row.extensions?.acta;
+  if(stamps && (Object.hasOwn(stamps,'guard_version') || Object.hasOwn(stamps,'schema_version')) &&
+      (stamps.guard_version!==guardVersion || stamps.schema_version!==schemaVersion))
+    issues.push({code:'import.unsupported_versions',path:'extensions.acta'});
+
   if(Array.isArray(root.characters)&&root.characters.length>1 && root.characters.every(x=>typeof x==='string') &&
       !sections.every(k=>Object.hasOwn(textChanges,k)))issues.push({code:'import.separate_profile_text'});
   for(const k of ['age','locations','phases'])if(!Object.hasOwn(spec,k))issues.push({code:'import.required',path:k});

@@ -2,6 +2,7 @@ import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { readdirSync,rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { publishCard,downloads,download } from '../store/card-assets.mjs';
 import { Storage } from '../store/commit.mjs';
 import { normalizeImport, importBytes } from '../engine/import.mjs';
 import { activeLore } from '../engine/import-world.mjs';
@@ -100,7 +101,16 @@ export function makeServer(options) {
       admit.limit(req);
       const owner=admit.authenticate(req);
       if(req.method==='GET' && route.startsWith('/v1/card/')){
-        const card=storage.owned('cards',route.slice('/v1/card/'.length),owner);
+        const parts=route.slice('/v1/card/'.length).split('/');
+        const card=storage.owned('cards',parts[0],owner);
+        if(parts.length!==1){
+          const kind=parts[1];
+          if(parts.length!==2 || !Object.hasOwn(downloads,kind))reject(404,'route.missing');
+          const payload=download(storage,card,kind);
+          res.writeHead(200,{'content-type':downloads[kind][1],'cache-control':'private, no-store',
+            'content-disposition':'attachment; filename="'+downloads[kind][0]+'"','content-length':payload.length});
+          return res.end(payload);
+        }
         return json(res,200,{card:{id:card.id,spec:card.spec,texts:card.texts,guard:card.guard,schema:card.schema}});
       }
       if(req.method==='GET' && route.startsWith('/v1/sessions/'))
@@ -115,10 +125,10 @@ export function makeServer(options) {
         if(b.dry_run!==undefined && typeof b.dry_run!=='boolean')reject(400,'import.dry_run');
         if(b.dry_run)return json(res,200,{...report,extensions,preview:{spec:card.spec,texts:card.texts,world:card.world}});
         if(!report.publishable)return json(res,422,{error:{code:'import.review_required',trace},...report,extensions});
-        const id=storage.create('cards',owner,{...card,extensions,guard:guardVersion,schema:schemaVersion});
-        audit.write('import_finish',{...fields,card_revision:id,container:report.kind,dual:report.dual,
+        const publication=publishCard(storage,owner,{...card,extensions,guard:guardVersion,schema:schemaVersion});
+        audit.write('import_finish',{...fields,card_revision:publication.card_revision,container:report.kind,dual:report.dual,
           changes:report.diff.length,registered:extensions.length,attempts:0,ms:Date.now()-began});
-        return json(res,201,{card_revision:id,slug:id,...report,extensions});
+        return json(res,201,{...publication,...report,extensions});
       }
       if(route==='/v1/sessions')return json(res,201,sessions.open(owner,b.card_revision));
       if(route==='/v1/card/build') {
@@ -134,10 +144,10 @@ export function makeServer(options) {
           }
         });
         stage='commit';
-        const revision=storage.create('cards',owner,{spec,texts:result.texts,guard:guardVersion,schema:schemaVersion});
-        fields.card_revision=revision;
+        const publication=publishCard(storage,owner,{spec,texts:result.texts,guard:guardVersion,schema:schemaVersion});
+        fields.card_revision=publication.card_revision;
         audit.write('job_finish',{...fields,verdict:'ok',ms:Date.now()-began,...counters()});
-        return json(res,201,{card_revision:revision,slug:revision,checks:{ok:true,warn:result.warn},engine:guardVersion});
+        return json(res,201,{...publication,checks:{ok:true,warn:result.warn},engine:guardVersion});
       }
       validatePlay(b);
       const sessionId=b.session_id??req.headers['x-session-id'];
@@ -156,7 +166,9 @@ export function makeServer(options) {
           mark();
           const result=await attempt('play',task,data=>{
             const checked=checkProse(data.text,policy);
-            const next=guard(state,Object.hasOwn(data,'events')?data.events:[],card.spec);
+            const next=guard(state,Object.hasOwn(data,'events')?data.events:[],card.spec,details=>{
+              audit.write('guard_turn',{...fields,guard_round:rev+1,...details});
+            });
             return {...checked,text:data.text,state:next};
           });
           stage='commit';

@@ -8,7 +8,7 @@ export function initial(spec) {
   return { location: spec.locations[0], phase: spec.phases[0] };
 }
 
-export function settle(state, candidates, spec) {
+export function settle(state, candidates, spec, onApplied = () => {}) {
   if (!Array.isArray(candidates) || candidates.length > 16) reject(422, 'state.events');
   const next = { ...state };
   for (const [index,event] of candidates.entries()) {
@@ -18,5 +18,7 @@ export function settle(state, candidates, spec) {
     else if (event.op === 'phase' && spec.phases.includes(event.value)) next.phase = event.value;
     else reject(422, 'state.invalid_transition', { event_index:index });
   }
+  onApplied({phase_forward: candidates.some(event => event.op === 'phase') &&
+    spec.phases.indexOf(next.phase) > spec.phases.indexOf(state.phase)});
   return next;
 }
