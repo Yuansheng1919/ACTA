@@ -14,7 +14,7 @@ const policy = {
   version: "probe-1",
   locations: ["home.living"], phases: ["早", "晚"],
   blocked: ["未成年"],                                  /* 子串段 */
-  patterns: ["\\d{1,3}\\s*岁", "小[学初高]生|校服|书包"], /* 正则段 */
+  patterns: ["\\d{1,3}\\s*岁", "[一二三四五六七八九十]{1,3}\\s*岁", "小[学初高]生|校服|书包"], /* 正则段 */
   templates: ["【场外点名】"],                            /* 点名模板段 */
   lengths: { description: [1, 999999], personality: [1, 999999], scenario: [1, 999999], first_mes: [1, 999999], mes_example: [1, 999999] },
   sentenceWarn: 45, similePer100: 4,
@@ -33,7 +33,8 @@ const pad = (s) => {
 
 const cases = [
   ["命中 blocked（子串）", pad("她未成年。"), "verdict.blocked"],
-  ["命中 patterns（正则-数字年龄）", pad("她十九岁，坐在床边。"), "verdict.pattern"],
+  ["命中 patterns（阿拉伯数字年龄）", pad("她 17 岁，坐在床边。"), "verdict.pattern"],
+  ["命中 patterns（中文数字年龄）", pad("她十九岁，坐在床边。"), "verdict.pattern"],
   ["命中 patterns（正则-校园物）", pad("她穿着校服。"), "verdict.pattern"],
   ["命中 templates（点名）", pad("【场外点名】隔壁的人在敲门。"), "verdict.template"],
   ["干净文本（应通过）", pad(""), null],
