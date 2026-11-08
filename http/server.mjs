@@ -8,6 +8,7 @@ import { activeLore } from '../engine/import-world.mjs';
 import { Sessions } from '../engine/session.mjs';
 import { checkSpec,checkSections,checkProse,parseArtifact,examplePolicy,object } from '../engine/gates.mjs';
 import { guardVersion,schemaVersion,settle } from '../engine/guard.mjs';
+import { runDirect } from '../engine/direct.mjs';
 import { runHost } from '../engine/host.mjs';
 import { Fault,reject } from '../engine/fault.mjs';
 import { Admission } from './admission.mjs';
@@ -55,7 +56,7 @@ function deliver(res,reply,stream) {
 }
 
 export function makeServer(options) {
-  const {root,host,policy=examplePolicy,guard=settle,afterCommit}=options;
+  const {root,host,direct,policy=examplePolicy,guard=settle,afterCommit}=options;
   const storage=new Storage(root),sessions=new Sessions(storage);
   // Single-writer startup. A killed process may leave the previous job's private artifacts.
   const jobs=join(root,'jobs');
@@ -67,6 +68,8 @@ export function makeServer(options) {
     const trace=randomUUID(),began=Date.now();
     const fields={trace,job_id:trace,guard:guardVersion,schema:schemaVersion,rules:policy.version};
     let sent=0,stage='route';
+    const counters=()=>({attempts:sent,upstream_calls:direct||!sent?sent:null,
+      tool_roundtrips:direct||!sent?0:null,host_invocations:direct?0:sent});
     res.setHeader('x-trace-id',trace);
     const route=(req.url??'').split('?')[0];
     async function attempt(kind,task,check) {
@@ -74,13 +77,14 @@ export function makeServer(options) {
       const text=JSON.stringify(task);
       if([...text].length>20000)reject(413,'context.size');
       sent++;
-      const attemptFields={...fields,attempt:sent,runner:'host',model:'configured-profile',queue_ms:0,
+      const attemptFields={...fields,attempt:sent,...counters(),runner:direct?'direct':'host',model:direct?'configured-direct':'configured-profile',queue_ms:0,
         input_tokens:null,output_tokens:null};
       let verdict='ok',metrics={};
       try {
-        stage='host';
+        stage=direct?'direct':'host';
         audit.write('job_dispatch',{...attemptFields,outcome:'unknown'});
-        const raw=await runHost({...host,root:jobs},text);
+        const raw=direct?await runDirect(direct,task):await runHost({...host,root:jobs},text);
+        Object.assign(attemptFields,raw.usage);
         stage='gate';
         const checked=check(parseArtifact(raw.text,kind));
         if(checked.actual!==undefined)metrics.actual=checked.actual;
@@ -125,14 +129,14 @@ export function makeServer(options) {
         const result=await admit.job(owner,async()=>{
           try{return await attempt('draft',task,check);}
           catch(e) {
-            if(!['card.section_length','card.missing_section'].includes(e.code))throw e;
+            if(direct || !['card.section_length','card.missing_section'].includes(e.code))throw e;
             return attempt('draft',{...task,correct:{rule:e.code,field:e.metrics.path}},check);
           }
         });
         stage='commit';
         const revision=storage.create('cards',owner,{spec,texts:result.texts,guard:guardVersion,schema:schemaVersion});
         fields.card_revision=revision;
-        audit.write('job_finish',{...fields,verdict:'ok',ms:Date.now()-began,attempts:sent});
+        audit.write('job_finish',{...fields,verdict:'ok',ms:Date.now()-began,...counters()});
         return json(res,201,{card_revision:revision,slug:revision,checks:{ok:true,warn:result.warn},engine:guardVersion});
       }
       validatePlay(b);
@@ -162,7 +166,7 @@ export function makeServer(options) {
       });
       fields.rev_after=reply.state_rev;
       fields.original_job=reply.completion.id.slice('chatcmpl-'.length);
-      audit.write('job_finish',{...fields,attempts:sent,verdict:'ok',ms:Date.now()-began,
+      audit.write('job_finish',{...fields,...counters(),verdict:'ok',ms:Date.now()-began,
         ...audit.proof(reply.completion.choices[0].message.content)});
       if(afterCommit)await afterCommit({res,trace});
       if(!res.destroyed)deliver(res,reply,b.stream===true);
@@ -170,7 +174,7 @@ export function makeServer(options) {
       const known=e instanceof Fault;
       const status=known?e.status:500,code=known?e.code:'internal';
       if(fields.rev_before!==undefined && known)fields.rev_after=fields.rev_before;
-      audit.write('job_failed',{...fields,stage,verdict:code,...(known?e.metrics:{}),attempts:sent,ms:Date.now()-began});
+      audit.write('job_failed',{...fields,stage,verdict:code,...(known?e.metrics:{}),...counters(),ms:Date.now()-began});
       if(!res.destroyed&&!res.headersSent)json(res,status,{error:{code,trace},...(known?e.importDetails:{})});
     }
   });
