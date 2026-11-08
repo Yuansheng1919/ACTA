@@ -166,7 +166,9 @@ export function makeServer(options) {
           mark();
           const result=await attempt('play',task,data=>{
             const checked=checkProse(data.text,policy);
-            const next=guard(state,Object.hasOwn(data,'events')?data.events:[],card.spec);
+            const next=guard(state,Object.hasOwn(data,'events')?data.events:[],card.spec,details=>{
+              audit.write('guard_turn',{...fields,guard_round:rev+1,...details});
+            });
             return {...checked,text:data.text,state:next};
           });
           stage='commit';
