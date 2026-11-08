@@ -1,0 +1,32 @@
+✔ M0-01/02 independent revocation, trusted last hop, restart and concurrent admission (4.888615ms)
+✔ M0-04 HMAC normalizes Unicode and rotates 14 UTC dates (1.458393ms)
+✔ M1-01 NFC Unicode code points and all five field boundaries (5.081155ms)
+✔ M0-03 hard prose band and lexical/template redlines (0.59579ms)
+✔ M1-05 guard rejects unknown paths, wrong types and out-of-set values (2.598325ms)
+✔ stock host contract: five modes, single-use warm worker and cleanup (413.442033ms)
+✔ artifact order, empty first part, stale artifact and nonzero exit (215.469998ms)
+✔ stdout-only success exit retains bounded private diagnostics and never publishes a draft (41.908658ms)
+✔ NO_PROXY/no_proxy inheritance and Windows host environment allowlist (0.712837ms)
+✔ M0-01 real proxy, health, revoked token and private resource ownership (306.239471ms)
+✔ M0-01 supplemental installed client SDK through the listening proxy (261.514148ms)
+✔ M0-02 one remaining round, two simultaneous sessions, shared IP, restart and spoofing (576.655668ms)
+✔ M0-03 withheld SSE, terminal lengths and refusal, one card repair at most (503.024167ms)
+ℹ M0-03 synthetic repair trace 9f845c7d-24bf-4396-be18-36191b0a0bf6 attempts=2
+✔ M0-04 input, accepted output, stdout/stderr and error probes do not escape diagnostic sinks (204.027438ms)
+ℹ M0-04 synthetic trace e1fc7ae6-7b19-411e-adfb-fb2b38304767 / f15c4e61-f7ea-496d-b623-0f7ab57764a9; private sink matches=0
+✔ M1-01 input rejects before dispatch, five-stage failures never publish a partial card (359.256299ms)
+✔ M1-03 three hand-written states, actual next prompt, untouched second session, restart/replay (351.375505ms)
+ℹ M1-03 synthetic trace 82a655a0-6a86-46bc-8b86-334ac4c84161 final_rev=3; rejected_event_index=0
+✔ M1-04 coalesces duplicates, arbitrates conflicts, replays post-commit disconnect and identifies in-doubt restart (706.391815ms)
+✔ M1-05 no-op mutation breaks three-round assertion; invalid transitions and unknown versions cannot publish (348.89923ms)
+✔ host rejects duplicate numeric sequences even when padding differs (53.391735ms)
+✔ normal start entry builds and plays through the configured artifact host (289.539073ms)
+✔ M1-04 atomic replay persists, orphan in flight is distinguishable (7.23563ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3764.438381

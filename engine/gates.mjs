@@ -70,10 +70,9 @@ export function checkSections(value, policy) {
 export function checkProse(text, policy) {
   if (typeof text !== 'string') reject(422, 'prose.invalid');
   const actual = count(text);
-  if (actual >= 1600) reject(422, 'verdict.len_over', { min:1200, max:1500, actual, direct_fail:true });
-  scan(text, policy, 'prose');
   if (actual < 1200 || actual > 1500)
-    reject(422, 'verdict.len_over', { min:1200, max:1500, actual, direct_fail:false });
+    reject(422, 'verdict.len_over', { min:1200, max:1500, actual, direct_fail:actual>=1600 });
+  scan(text, policy, 'prose');
   return { actual, warn: style(text, policy) };
 }
 
