@@ -1,0 +1,64 @@
+{
+  "spec": "chara_card_v3",
+  "spec_version": "3.0",
+  "data": {
+    "name": "合成角色E5",
+    "description": "【合成样本 ACTA-PROBE-E5】这是验收用合成描述，不含真实内容。【合成样本 ACTA-PROBE-E5】这是验收用合成描述，不含真实内容。【合成样本 ACTA-PROBE-E5】这是验收用合成描述，不含真实内容。",
+    "personality": "合成性格：谨慎、话少。ACTA-PROBE-E5",
+    "scenario": "合成场景：一间测试用的房间。",
+    "first_mes": "合成开场白 ACTA-PROBE-E5。",
+    "mes_example": "<START>\n{{user}}: 测试\n{{char}}: 合成回复 ACTA-PROBE-E5。",
+    "creator_notes": "验收合成样本，不入库、不外发。",
+    "tags": [
+      "synthetic",
+      "acceptance"
+    ],
+    "alternate_greetings": [],
+    "extensions": {
+      "regex_scripts": [
+        {
+          "id": "synthetic-hide",
+          "scriptName": "[合成]隐藏块",
+          "findRegex": "/<X>[\\s\\S]*?<\\/X>/g",
+          "replaceString": "",
+          "placement": [
+            2
+          ],
+          "disabled": false,
+          "markdownOnly": true,
+          "trimStrings": []
+        }
+      ],
+      "mvu_skin": {
+        "assets_base": "./assets/synthetic/",
+        "v": 1,
+        "entities": {
+          "主角": {
+            "label": "角色"
+          },
+          "角色A": {
+            "label": "她",
+            "portrait": {
+              "by_path": "角色A.心情",
+              "file": "a/head_{value}.webp",
+              "fallback": "a/head_default.webp"
+            }
+          }
+        },
+        "maps": {
+          "locations": {
+            "home.living": "客厅"
+          }
+        }
+      },
+      "tavern_helper": {
+        "scripts": [
+          {
+            "name": "合成守卫",
+            "content": "/* 合成脚本：导入方不得执行 */\nthrow new Error('must not run');"
+          }
+        ]
+      }
+    }
+  }
+}
