@@ -1,0 +1,12 @@
+{
+  "name": "旧规范角色B2",
+  "description": "【旧规范合成样本 ACTA-PROBE-B2】扁平字段版本。",
+  "personality": "扁平性格 ACTA-PROBE-B2",
+  "scenario": "扁平场景。",
+  "first_mes": "扁平开场 ACTA-PROBE-B2。",
+  "mes_example": "<START>\n{{user}}: 测试\n{{char}}: 扁平回复 ACTA-PROBE-B2。",
+  "avatar": "none",
+  "chat": "",
+  "create_date": "2026-01-01T00:00:00Z",
+  "creatorcomment": "旧规范合成样本"
+}
