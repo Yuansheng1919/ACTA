@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
-const inputRef='d9e18d247f0097ea387f5de0c44b37219a33f9e9';
+const inputRef='43ae980';
 const execGit=(args)=>execFileSync('git',args,{cwd:root,stdio:['ignore','pipe','pipe']});
 let folder=resolve(process.env.ACTA_ACCEPTANCE_DIR??join(root,'acceptance'));
 let temp;
@@ -29,6 +29,6 @@ try {
     env:{...process.env,ACTA_ACCEPTANCE_DIR:folder}});
   process.exitCode=child.status??1;
 } catch {
-  console.error('Acceptance inputs unavailable. Provide ACTA_ACCEPTANCE_DIR or fetch the repository main branch containing d9e18d2.');
+  console.error('Acceptance inputs unavailable. Provide ACTA_ACCEPTANCE_DIR or fetch the repository main branch containing 43ae980.');
   process.exitCode=1;
 } finally {if(temp)rmSync(temp,{recursive:true,force:true});}

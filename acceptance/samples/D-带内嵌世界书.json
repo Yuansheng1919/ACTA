@@ -1,0 +1,62 @@
+{
+  "spec": "chara_card_v3",
+  "spec_version": "3.0",
+  "data": {
+    "name": "合成角色D4",
+    "description": "【合成样本 ACTA-PROBE-D4】这是验收用合成描述，不含真实内容。【合成样本 ACTA-PROBE-D4】这是验收用合成描述，不含真实内容。【合成样本 ACTA-PROBE-D4】这是验收用合成描述，不含真实内容。",
+    "personality": "合成性格：谨慎、话少。ACTA-PROBE-D4",
+    "scenario": "合成场景：一间测试用的房间。",
+    "first_mes": "合成开场白 ACTA-PROBE-D4。",
+    "mes_example": "<START>\n{{user}}: 测试\n{{char}}: 合成回复 ACTA-PROBE-D4。",
+    "creator_notes": "验收合成样本，不入库、不外发。",
+    "tags": [
+      "synthetic",
+      "acceptance"
+    ],
+    "alternate_greetings": [],
+    "extensions": {
+      "acta_engine": "test-0"
+    },
+    "character_book": {
+      "name": "合成世界书",
+      "entries": [
+        {
+          "uid": 0,
+          "comment": "[initvar]合成初始化",
+          "content": "{\n  \"世界\": {\n    \"天数\": 1,\n    \"时段\": \"午\",\n    \"日程\": \"周中\"\n  },\n  \"角色A\": {\n    \"好感\": 20\n  },\n  \"角色B\": {\n    \"好感\": 24\n  }\n}",
+          "disable": true,
+          "constant": true,
+          "position": 0,
+          "depth": 4
+        },
+        {
+          "uid": 1,
+          "comment": "合成规则",
+          "content": "时段只能取 早/晚；地点只能 home.*；不得出现第二角色。",
+          "disable": false,
+          "constant": true,
+          "position": 1,
+          "depth": 4
+        },
+        {
+          "uid": 2,
+          "comment": "合成镜像",
+          "content": "世界.时段=午\n角色B.好感=24",
+          "disable": false,
+          "constant": true,
+          "position": 1,
+          "depth": 4
+        },
+        {
+          "uid": 7,
+          "comment": "合成停用条目",
+          "content": "---（停用）",
+          "disable": true,
+          "constant": false,
+          "position": 4,
+          "depth": 0
+        }
+      ]
+    }
+  }
+}
