@@ -1,0 +1,41 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { mkdtempSync,rmSync,readdirSync,writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Storage,hash } from '../store/commit.mjs';
+import { Admission } from '../http/admission.mjs';
+import { auditLog } from '../log/audit.mjs';
+
+test('M0-01/02 independent revocation, trusted last hop, restart and concurrent admission',async t=>{
+  const root=mkdtempSync(join(tmpdir(),'acta-limit-'));
+  t.after(()=>rmSync(root,{recursive:true,force:true}));
+  new Storage(root);
+  const tokens=[randomBytes(16).toString('hex'),randomBytes(16).toString('hex')];
+  let hashes=tokens.map(hash);
+  const config={root,credentials:()=>hashes,daily:1,ipBurst:1,trustedProxy:'127.0.0.1'};
+  const a=new Admission(config);
+  const req={headers:{authorization:'Bearer '+tokens[0],'x-forwarded-for':'192.0.2.1'},socket:{remoteAddress:'192.0.2.2'}};
+  assert.equal(a.authenticate(req),hashes[0]);
+  a.limit(req);req.headers['x-forwarded-for']='192.0.2.3';
+  assert.throws(()=>a.limit(req),{code:'limit.ip'});
+  req.socket.remoteAddress=config.trustedProxy; a.limit(req);
+  req.headers['x-forwarded-for']='192.0.2.1'; a.limit(req);
+  const first=a.job(hashes[0],async()=>1);
+  await assert.rejects(a.job(hashes[0],async()=>2),{status:429});
+  assert.equal(await first,1);
+  await assert.rejects(new Admission(config).job(hashes[0],async()=>2),{status:429});
+  await a.job(hashes[1],async()=>1);
+  hashes=hashes.slice(1);
+  assert.throws(()=>a.authenticate(req),{status:401});
+});
+test('M0-04 HMAC normalizes Unicode and rotates 14 UTC dates',t=>{
+  const root=mkdtempSync(join(tmpdir(),'acta-audit-'));new Storage(root);
+  t.after(()=>rmSync(root,{recursive:true,force:true}));
+  const log=auditLog({root,key:randomBytes(32)});
+  assert.deepEqual(log.proof('é'),log.proof('e\u0301'));
+  const old=join(root,'logs','2000-01-01.jsonl'); writeFileSync(old,'');
+  log.write('job.start',{trace:'synthetic'});
+  assert.equal(readdirSync(join(root,'logs')).length,1);
+});
