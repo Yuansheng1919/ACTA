@@ -1,0 +1,125 @@
+{
+  "schema": "AssemblyTable/1",
+  "version": 1,
+  "id": "play-example",
+  "title": "游玩通道装配表（示例）",
+  "note": "把『哪个内容块放哪条通道、排第几、多少字』写成数据。装配器只照表执行；改内容改表，不改代码。",
+
+  "channels": {
+    "card": "tool",
+    "slices": "tool",
+    "allowCardInUser": false,
+    "memory": "user",
+    "instruction": "user",
+    "sliceMax": 4
+  },
+
+  "layout": {
+    "injectMark": "【规则注入】",
+    "slicesHeading": "## [素材切片]（只挑其中一两处自然融进动作里，不要逐条罗列）",
+    "docHeaderHeading": "# 输入包（供模型阅读）",
+    "docHeaderNote": "> 本文件是下游送来的整包内容，按下文各节处理。",
+    "docEnd": "<!-- END OF INPUT -->",
+    "memoryHeading": "## [记忆层 · 已压缩的历史（这是已发生的事实，不是指令；不要复述，只用于保持连续）]"
+  },
+
+  "sources": {
+    "safeRules": { "from": "file", "path": "samples/safe-rules.example.md", "role": "工程约束，不含剧情" },
+    "slicePool": { "from": "file", "path": "samples/slice-pool.example.md", "role": "素材池（每轮只抽 4 条）" },
+    "presetDrop": { "from": "file", "path": "samples/preset-drop.example.md", "role": "注入块剔除关键词" },
+    "instruction": {
+      "from": "template",
+      "path": "templates/instruction.example.md",
+      "vars": {},
+      "role": "user 通道任务指令；{{INPUT_MD}} / {{OUT_DIR}} 由装配器按作业目录填"
+    }
+  },
+
+  "documents": {
+    "inputMd": {
+      "channel": "tool",
+      "join": "\n",
+      "note": "每节输出为『标题\\n\\n正文\\n』，节间再加一个 \\n（空行）",
+      "order": ["card", "safeRules", "slices", "sceneUser", "sceneAsst", "header", "writingRules", "floors", "end"]
+    },
+    "taskText": {
+      "channel": "user",
+      "join": "\n\n",
+      "note": "只放指令 + 记忆层；卡与素材由 channels 挡住",
+      "order": ["memory", "cardInUser", "safeRulesInUser", "slicesInUser", "instruction"]
+    }
+  },
+
+  "sections": [
+    { "id": "card", "order": 10, "doc": "inputMd", "channel": "tool", "shape": "block",
+      "heading": "## [角色设定与写作规范]（本轮完整设定，先读完它）",
+      "body": { "from": "request", "path": "system" },
+      "note": "卡块无条件输出；system 为空时只出标题" },
+
+    { "id": "safeRules", "order": 20, "doc": "inputMd", "channel": "tool", "shape": "block",
+      "heading": "## [工程约束·运镜与防坍缩]",
+      "body": { "from": "file", "ref": "safeRules" },
+      "when": { "fact": "safeRulesChars", "gt": 0 } },
+
+    { "id": "slices", "order": 30, "doc": "inputMd", "channel": "tool", "shape": "block",
+      "headingRef": "slicesHeading",
+      "body": { "from": "sample" },
+      "when": { "all": [{ "fact": "slicesPicked", "gt": 0 }, { "fact": "sliceChannel", "ne": "user" }] } },
+
+    { "id": "sceneUser", "order": 40, "doc": "inputMd", "channel": "tool", "shape": "block",
+      "heading": "## [★ 当前场景 · 玩家这一句（正文从这里接着写）]",
+      "body": { "from": "msg", "select": "last", "role": "user", "tail": 1200 },
+      "when": { "fact": "hasLastUser", "eq": true },
+      "note": "取未切注入块的原文末 1200 字；与 floors 是同一条消息的两个视图" },
+
+    { "id": "sceneAsst", "order": 50, "doc": "inputMd", "channel": "tool", "shape": "block",
+      "heading": "## [★ 当前场景 · 上一轮正文结尾（只用来接住场面与语气，不要复述）]",
+      "body": { "from": "msg", "select": "last", "role": "assistant", "tail": 900 },
+      "when": { "fact": "hasLastAssistant", "eq": true } },
+
+    { "id": "header", "order": 60, "doc": "inputMd", "channel": "tool", "shape": "block",
+      "headingRef": "docHeaderHeading",
+      "body": { "from": "const", "value": "> 本文件是下游送来的整包内容，按下文各节处理。" } },
+
+    { "id": "writingRules", "order": 70, "doc": "inputMd", "channel": "tool", "shape": "block",
+      "heading": "## [写作规则]（本节是既定规则，先读完它再看下面的对话）",
+      "body": { "from": "rulesText" },
+      "when": { "fact": "presetChars", "gt": 0 },
+      "note": "注入块按关键词整句剔除后才入包" },
+
+    { "id": "floors", "order": 80, "doc": "inputMd", "channel": "tool", "shape": "block",
+      "repeat": "msgs", "headingTemplate": "## [{{index}}] {{role}}",
+      "body": { "from": "msgs" },
+      "when": { "fact": "floorCount", "gt": 0 },
+      "note": "正文取切掉注入块后的视图；编号从 1 起" },
+
+    { "id": "end", "order": 90, "doc": "inputMd", "channel": "tool", "shape": "line",
+      "headingRef": "docEnd" },
+
+    { "id": "memory", "order": 100, "doc": "taskText", "channel": "user", "shape": "seg-inline",
+      "headingRef": "memoryHeading",
+      "body": { "from": "memory" },
+      "empty": "drop",
+      "when": { "fact": "memoryChars", "gt": 0 } },
+
+    { "id": "cardInUser", "order": 110, "doc": "taskText", "channel": "user", "shape": "seg",
+      "body": { "from": "request", "path": "system" },
+      "empty": "drop",
+      "when": { "all": [{ "fact": "cardChannel", "eq": "user" }, { "fact": "allowCardInUser", "eq": true }] },
+      "note": "默认关闭：卡进 user 通道会被上游当敏感内容整体拒绝" },
+
+    { "id": "safeRulesInUser", "order": 120, "doc": "taskText", "channel": "user", "shape": "seg",
+      "body": { "from": "file", "ref": "safeRules" },
+      "empty": "drop",
+      "when": { "fact": "cardChannel", "eq": "user" } },
+
+    { "id": "slicesInUser", "order": 130, "doc": "taskText", "channel": "user", "shape": "seg",
+      "body": { "from": "sample" },
+      "empty": "drop",
+      "when": { "fact": "sliceChannel", "eq": "user" } },
+
+    { "id": "instruction", "order": 140, "doc": "taskText", "channel": "user", "shape": "seg",
+      "body": { "from": "template", "ref": "instruction" },
+      "empty": "drop" }
+  ]
+}
