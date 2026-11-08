@@ -1,0 +1,35 @@
+{
+  "chara": {
+    "name": "旧块名字",
+    "description": "【旧规范合成样本 ACTA-PROBE-C3】扁平字段版本。",
+    "personality": "扁平性格 ACTA-PROBE-C3",
+    "scenario": "扁平场景。",
+    "first_mes": "扁平开场 ACTA-PROBE-C3。",
+    "mes_example": "<START>\n{{user}}: 测试\n{{char}}: 扁平回复 ACTA-PROBE-C3。",
+    "avatar": "none",
+    "chat": "",
+    "create_date": "2026-01-01T00:00:00Z",
+    "creatorcomment": "旧规范合成样本"
+  },
+  "ccv3": {
+    "spec": "chara_card_v3",
+    "spec_version": "3.0",
+    "data": {
+      "name": "新块名字",
+      "description": "【合成样本 ACTA-PROBE-C3】这是验收用合成描述，不含真实内容。【合成样本 ACTA-PROBE-C3】这是验收用合成描述，不含真实内容。【合成样本 ACTA-PROBE-C3】这是验收用合成描述，不含真实内容。",
+      "personality": "合成性格：谨慎、话少。ACTA-PROBE-C3",
+      "scenario": "合成场景：一间测试用的房间。",
+      "first_mes": "合成开场白 ACTA-PROBE-C3。",
+      "mes_example": "<START>\n{{user}}: 测试\n{{char}}: 合成回复 ACTA-PROBE-C3。",
+      "creator_notes": "验收合成样本，不入库、不外发。",
+      "tags": [
+        "synthetic",
+        "acceptance"
+      ],
+      "alternate_greetings": [],
+      "extensions": {
+        "acta_engine": "test-0"
+      }
+    }
+  }
+}
