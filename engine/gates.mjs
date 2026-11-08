@@ -80,16 +80,18 @@ function style(text, policy) {
     simile_density: similes * 100 / Math.max(n,1) > policy.similePer100 };
 }
 
+export function checkSection(key,text,policy) {
+  if (typeof text !== 'string' || !text.trim()) reject(422, 'card.missing_section', { path:key });
+  scan(text,policy,key);
+  const actual=count(text), [min,max]=policy.lengths[key];
+  if(actual<min || actual>max)reject(422,'card.section_length',{path:key,min,max,actual});
+}
+
 export function checkSections(value, policy) {
   const texts = {};
   for (const key of sections) {
-    const text = value?.[key];
-    if (typeof text !== 'string' || !text.trim()) reject(422, 'card.missing_section', { path: key });
-    scan(text, policy, key);
-    const actual = count(text);
-    const [min,max] = policy.lengths[key];
-    if (actual < min || actual > max) reject(422, 'card.section_length', { path: key, min, max, actual });
-    texts[key] = text;
+    checkSection(key,value?.[key],policy);
+    texts[key] = value[key];
   }
   return { texts, warn: style(Object.values(texts).join('。'), policy) };
 }

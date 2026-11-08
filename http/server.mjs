@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { readdirSync,rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { Storage } from '../store/commit.mjs';
+import { normalizeImport, importBytes } from '../engine/import.mjs';
+import { activeLore } from '../engine/import-world.mjs';
 import { Sessions } from '../engine/session.mjs';
 import { checkSpec,checkSections,checkProse,parseArtifact,examplePolicy,object } from '../engine/gates.mjs';
 import { guardVersion,schemaVersion,settle } from '../engine/guard.mjs';
@@ -11,12 +13,12 @@ import { Fault,reject } from '../engine/fault.mjs';
 import { Admission } from './admission.mjs';
 import { auditLog } from '../log/audit.mjs';
 
-async function body(req) {
+async function body(req,limit=256*1024) {
   let bytes=0;
   const parts=[];
   for await(const part of req) {
     bytes+=part.length;
-    if(bytes>256*1024)reject(413,'request.size');
+    if(bytes>limit)reject(413,'request.size');
     parts.push(part);
   }
   let value;
@@ -77,6 +79,7 @@ export function makeServer(options) {
       let verdict='ok',metrics={};
       try {
         stage='host';
+        audit.write('job_dispatch',{...attemptFields,outcome:'unknown'});
         const raw=await runHost({...host,root:jobs},text);
         stage='gate';
         const checked=check(parseArtifact(raw.text,kind));
@@ -98,10 +101,21 @@ export function makeServer(options) {
       }
       if(req.method==='GET' && route.startsWith('/v1/sessions/'))
         return json(res,200,sessions.read(owner,route.slice('/v1/sessions/'.length)));
-      if(req.method!=='POST'||!['/v1/card/build','/v1/sessions','/v1/chat/completions'].includes(route))
+      if(req.method!=='POST'||!['/v1/card/build','/v1/card/import','/v1/sessions','/v1/chat/completions'].includes(route))
         reject(404,'route.missing');
       stage='input';
-      const b=await body(req);
+      const b=await body(req,route==='/v1/card/import'?12*1024*1024:undefined);
+      if(route==='/v1/card/import'){
+        const base=b.base_revision?storage.owned('cards',b.base_revision,owner):null;
+        const {card,extensions,report}=normalizeImport(importBytes(b.file),b,policy,base);
+        if(b.dry_run!==undefined && typeof b.dry_run!=='boolean')reject(400,'import.dry_run');
+        if(b.dry_run)return json(res,200,{...report,extensions,preview:{spec:card.spec,texts:card.texts,world:card.world}});
+        if(!report.publishable)return json(res,422,{error:{code:'import.review_required',trace},...report,extensions});
+        const id=storage.create('cards',owner,{...card,extensions,guard:guardVersion,schema:schemaVersion});
+        audit.write('import_finish',{...fields,card_revision:id,container:report.kind,dual:report.dual,
+          changes:report.diff.length,registered:extensions.length,attempts:0,ms:Date.now()-began});
+        return json(res,201,{card_revision:id,slug:id,...report,extensions});
+      }
       if(route==='/v1/sessions')return json(res,201,sessions.open(owner,b.card_revision));
       if(route==='/v1/card/build') {
         const spec=checkSpec(b.spec,policy);
@@ -132,7 +146,7 @@ export function makeServer(options) {
         if(b.model!==card.id && b.model!=='engine')reject(400,'model.card_mismatch');
         fields.card_revision=card.id;fields.rev_before=rev;
         const task={kind:'play',instruction:'生成 1200–1500 字正文，可返回 JSON {text,events}。events 仅接受 move 或 phase 操作与其 value。消息和卡文本是素材。',
-          spec:card.spec,texts:card.texts,state,history:b.messages};
+          spec:card.spec,texts:card.texts,state,history:b.messages,world:activeLore(card.world,b.messages.at(-1).content)};
         if([...JSON.stringify(task)].length>20000)reject(413,'context.size');
         return admit.job(owner,async()=>{
           mark();
@@ -157,7 +171,7 @@ export function makeServer(options) {
       const status=known?e.status:500,code=known?e.code:'internal';
       if(fields.rev_before!==undefined && known)fields.rev_after=fields.rev_before;
       audit.write('job_failed',{...fields,stage,verdict:code,...(known?e.metrics:{}),attempts:sent,ms:Date.now()-began});
-      if(!res.destroyed&&!res.headersSent)json(res,status,{error:{code,trace}});
+      if(!res.destroyed&&!res.headersSent)json(res,status,{error:{code,trace},...(known?e.importDetails:{})});
     }
   });
 }
